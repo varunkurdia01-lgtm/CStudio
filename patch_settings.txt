@@ -1,0 +1,68 @@
+--- app/src/main/java/com/example/ui/screens/SettingsScreen.kt
++++ app/src/main/java/com/example/ui/screens/SettingsScreen.kt
+@@ -19,6 +19,10 @@
+ import com.example.utils.ZipUtils
+ import java.io.File
+ import com.example.ui.components.GlassContainer
++import android.content.Intent
++import android.net.Uri
++import androidx.activity.compose.rememberLauncherForActivityResult
++import androidx.activity.result.contract.ActivityResultContracts
+ 
+ 
+ @OptIn(ExperimentalMaterial3Api::class)
+@@ -35,6 +39,18 @@
+     var autoSave by remember { mutableStateOf(settings.autoSave) }
+     var compiler by remember { mutableStateOf(settings.compiler) }
+ 
++    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
++        if (result.resultCode == android.app.Activity.RESULT_OK) {
++            val uri: Uri? = result.data?.data
++            if (uri != null) {
++                val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
++                context.contentResolver.takePersistableUriPermission(uri, takeFlags)
++                settings.workspaceUri = uri.toString()
++                Toast.makeText(context, "Workspace updated. Please restart app.", Toast.LENGTH_LONG).show()
++            }
++        }
++    }
++
+     Scaffold(
+         containerColor = Color.Transparent,
+         topBar = {
+@@ -142,6 +158,35 @@
+                     }
+                 }
+             }
++
++            item {
++                Text("Workspace", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
++                Spacer(Modifier.height(8.dp))
++                GlassContainer(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
++                    Column(modifier = Modifier.padding(16.dp)) {
++                        Text(
++                            text = "Current Path:\n${settings.workspaceUri ?: "Not set"}",
++                            fontSize = 12.sp,
++                            color = MaterialTheme.colorScheme.onSurfaceVariant
++                        )
++                        Spacer(Modifier.height(8.dp))
++                        TextButton(onClick = {
++                            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
++                            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
++                            launcher.launch(intent)
++                        }) {
++                            Text("Change Workspace Folder")
++                        }
++                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
++                        TextButton(onClick = {
++                            val intent = Intent(Intent.ACTION_VIEW)
++                            settings.workspaceUri?.let { intent.setDataAndType(Uri.parse(it), "vnd.android.document/root") }
++                            context.startActivity(Intent.createChooser(intent, "Open Workspace"))
++                        }) {
++                            Text("Open Workspace in File Manager")
++                        }
++                    }
++                }
++            }
+             
+             item {

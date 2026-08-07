@@ -1,0 +1,22 @@
+--- app/src/main/java/com/example/ui/screens/EditorScreen.kt
++++ app/src/main/java/com/example/ui/screens/EditorScreen.kt
+@@ -52,6 +52,18 @@
+     val codeText = activeFile?.content?.text ?: ""
+     val fontSize = viewModel.settingsRepository.editorFontSize.sp
+         
++    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
++    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
++        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
++            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE || event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
++                viewModel.flushSave()
++            }
++        }
++        lifecycleOwner.lifecycle.addObserver(observer)
++        onDispose {
++            lifecycleOwner.lifecycle.removeObserver(observer)
++            viewModel.flushSave()
++        }
++    }
++
+     if (showInputDialog) {
+         AlertDialog(

@@ -1,0 +1,27 @@
+--- app/src/main/java/com/example/ui/screens/HomeScreen.kt
++++ app/src/main/java/com/example/ui/screens/HomeScreen.kt
+@@ -40,6 +40,9 @@
+ import androidx.compose.ui.platform.LocalContext
++import androidx.lifecycle.Lifecycle
++import androidx.lifecycle.LifecycleEventObserver
++import androidx.lifecycle.compose.LocalLifecycleOwner
+ 
+ @Composable
+@@ -58,7 +61,9 @@
+     var lastOpenedFile by remember { mutableStateOf<Pair<String, String>?>(null) }
+     var allFiles by remember { mutableStateOf<List<File>>(emptyList()) }
++    val lifecycleOwner = LocalLifecycleOwner.current
+     
+-    LaunchedEffect(Unit) {
++    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
++        val observer = LifecycleEventObserver { _, event ->
++            if (event == Lifecycle.Event.ON_RESUME) {
+                 val tabs = settingsRepository.getOpenTabsList()
+                 if (tabs.isNotEmpty()) {
+@@ -74,4 +79,7 @@
+                 allFiles = filesList.sortedByDescending { it.lastModified() }
++            }
++        }
++        lifecycleOwner.lifecycle.addObserver(observer)
++        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+     }
