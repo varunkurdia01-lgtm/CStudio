@@ -5,9 +5,22 @@ import java.io.File
 
 class BundledToolchainManager(private val context: Context) {
 
-    // Expected install location inside app private storage.
-    val toolchainDir: File
+    private val executionRoot: File
+        get() = File(context.codeCacheDir, "cstudio_runtime")
+
+    private val legacyToolchainDir: File
         get() = File(context.filesDir, "toolchain")
+
+    /**
+     * Active install location for the offline compiler.
+     *
+     * We keep the runtime inside codeCacheDir because Android is much happier
+     * executing native binaries from there than from filesDir. Existing installs
+     * in filesDir/toolchain are migrated automatically the first time the app
+     * touches the toolchain.
+     */
+    val toolchainDir: File
+        get() = resolveToolchainDir()
 
     val binDir: File
         get() = File(toolchainDir, "bin")
@@ -24,62 +37,66 @@ class BundledToolchainManager(private val context: Context) {
     val resourceIncludeDir: File
         get() = File(resourceDir, "include")
 
-    fun getCCompiler(): File {
-        return File(binDir, "clang")
-    }
+    fun getCCompiler(): File = File(binDir, "clang")
 
     /**
      * C++ compilation is driven by the same clang binary with -x c++.
      * We keep this method for compatibility with the existing codebase.
      */
-    fun getCppCompiler(): File {
-        return File(binDir, "clang")
+    fun getCppCompiler(): File = File(binDir, "clang")
+
+    fun getLinker(): File = File(binDir, "ld.lld")
+
+    fun getLibcxxShared(): File = File(libDir, "libc++_shared.so")
+
+    fun getLibLLVM(): File = File(libDir, "libLLVM.so")
+
+    fun getLibClangCpp(): File = File(libDir, "libclang-cpp.so")
+
+    fun getIncludes(): File = includeDir
+
+    fun getAndroidHeadersDir(): File = File(includeDir, "aarch64-linux-android")
+
+    fun getClangResourceDir(): File = resourceDir
+
+    fun createWorkspaceDir(workspaceId: String): File {
+        val workspaceRoot = File(context.codeCacheDir, "compiler_workspace")
+        return File(workspaceRoot, workspaceId)
     }
 
-    fun getLinker(): File {
-        return File(binDir, "ld.lld")
-    }
-
-    fun getLibcxxShared(): File {
-        return File(libDir, "libc++_shared.so")
-    }
-
-    fun getLibLLVM(): File {
-        return File(libDir, "libLLVM.so")
-    }
-
-    fun getLibClangCpp(): File {
-        return File(libDir, "libclang-cpp.so")
-    }
-
-    fun getIncludes(): File {
-        return includeDir
-    }
-
-    fun getAndroidHeadersDir(): File {
-        return File(includeDir, "aarch64-linux-android")
-    }
-
-    fun getClangResourceDir(): File {
-        return resourceDir
+    fun ensureToolchainReady(): Boolean {
+        val activeDir = toolchainDir
+        ensureExecutablePermissions(activeDir)
+        return isToolchainBundled
     }
 
     val isToolchainBundled: Boolean
-        get() = toolchainDir.exists() &&
-            getCCompiler().exists() &&
-            getLinker().exists() &&
-            getLibcxxShared().exists() &&
-            getLibLLVM().exists() &&
-            getLibClangCpp().exists() &&
-            includeDir.exists() &&
-            getAndroidHeadersDir().exists() &&
-            getClangResourceDir().exists()
+        get() {
+            val activeDir = toolchainDir
+            ensureExecutablePermissions(activeDir)
+            return activeDir.exists() &&
+                getCCompiler().isFile &&
+                getLinker().isFile &&
+                getLibcxxShared().isFile &&
+                getLibLLVM().isFile &&
+                getLibClangCpp().isFile &&
+                includeDir.isDirectory &&
+                getAndroidHeadersDir().isDirectory &&
+                getClangResourceDir().isDirectory &&
+                getCCompiler().canExecute() &&
+                getLinker().canExecute()
+        }
 
     fun checkToolchainStatus(): String {
+        val activeDir = toolchainDir
+        ensureExecutablePermissions(activeDir)
+
         val sb = StringBuilder()
         sb.append("Bundled Toolchain Status:\n")
-        sb.append("Toolchain Dir Exists: ${toolchainDir.exists()}\n")
-        sb.append("Toolchain Dir: ${toolchainDir.absolutePath}\n\n")
+        sb.append("Runtime Root: ${executionRoot.absolutePath}\n")
+        sb.append("Toolchain Dir Exists: ${activeDir.exists()}\n")
+        sb.append("Toolchain Dir: ${activeDir.absolutePath}\n")
+        sb.append("Legacy Toolchain Dir Exists: ${legacyToolchainDir.exists()}\n\n")
 
         val cCompiler = getCCompiler()
         sb.append("C Compiler (clang) Exists: ${cCompiler.exists()} (${cCompiler.absolutePath})\n")
@@ -120,11 +137,50 @@ class BundledToolchainManager(private val context: Context) {
         sb.append("\nArchitecture Supported: arm64-v8a (Expected)\n")
 
         if (!isToolchainBundled) {
-            sb.append("\nLocal compiler toolchain is not bundled yet.")
+            sb.append("\nLocal compiler toolchain is not installed yet.")
         } else {
             sb.append("\nToolchain is ready.")
         }
 
         return sb.toString()
+    }
+
+    private fun resolveToolchainDir(): File {
+        val preferredDir = File(executionRoot, "toolchain")
+        if (preferredDir.exists()) {
+            ensureExecutablePermissions(preferredDir)
+            return preferredDir
+        }
+
+        if (legacyToolchainDir.exists()) {
+            preferredDir.parentFile?.mkdirs()
+            val moved = legacyToolchainDir.renameTo(preferredDir)
+            if (!moved) {
+                legacyToolchainDir.copyRecursively(preferredDir, overwrite = true)
+                legacyToolchainDir.deleteRecursively()
+            }
+            ensureExecutablePermissions(preferredDir)
+            return preferredDir
+        }
+
+        preferredDir.parentFile?.mkdirs()
+        return preferredDir
+    }
+
+    private fun ensureExecutablePermissions(dir: File) {
+        if (!dir.exists()) return
+
+        // Make sure native binaries inside any */bin/ directory are executable.
+        dir.walkTopDown()
+            .filter { it.isFile && it.parentFile?.name == "bin" }
+            .forEach { file ->
+                try {
+                    file.setReadable(true, true)
+                    file.setWritable(true, true)
+                    file.setExecutable(true, true)
+                } catch (_: SecurityException) {
+                    // Best effort only; we still keep validation in isToolchainBundled.
+                }
+            }
     }
 }

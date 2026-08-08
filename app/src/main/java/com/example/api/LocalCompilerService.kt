@@ -13,7 +13,7 @@ class LocalCompilerService(private val context: Context) : CompilerService {
     override suspend fun compileCode(request: CompileRequest): CompileResponse = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
 
-        if (!toolchainManager.isToolchainBundled) {
+        if (!toolchainManager.ensureToolchainReady()) {
             return@withContext CompileResponse(
                 stdout = "",
                 stderr = "Local compiler toolchain is not installed yet.\n\n${toolchainManager.checkToolchainStatus()}",
@@ -22,7 +22,7 @@ class LocalCompilerService(private val context: Context) : CompilerService {
         }
 
         val workspaceId = UUID.randomUUID().toString()
-        val workspaceDir = File(File(context.filesDir, "compiler_workspace"), workspaceId)
+        val workspaceDir = toolchainManager.createWorkspaceDir(workspaceId)
         if (!workspaceDir.exists()) {
             workspaceDir.mkdirs()
         }
@@ -36,6 +36,14 @@ class LocalCompilerService(private val context: Context) : CompilerService {
             sourceFile.writeText(request.code)
 
             val compilerBinary = toolchainManager.getCCompiler()
+            if (!compilerBinary.exists() || !compilerBinary.canExecute()) {
+                return@withContext CompileResponse(
+                    stdout = "",
+                    stderr = "Compiler binary is present but not executable.\n\n${toolchainManager.checkToolchainStatus()}",
+                    executionTimeMs = System.currentTimeMillis() - startTime
+                )
+            }
+
             val compileArgs = buildCompileArgs(
                 compilerBinary = compilerBinary,
                 isCpp = isCpp,

@@ -42,7 +42,10 @@ object ToolchainInstaller {
             copyChildren(root, destinationDir)
             ensureExecutableBits(destinationDir)
 
+            // Force the manager to use the new execution-safe location and verify it.
             val verifiedManager = BundledToolchainManager(context)
+            verifiedManager.ensureToolchainReady()
+
             if (!verifiedManager.isToolchainBundled) {
                 return@withContext ToolchainInstallResult(
                     false,
@@ -131,8 +134,12 @@ object ToolchainInstaller {
         binDir.walkTopDown()
             .filter { it.isFile }
             .forEach { file ->
-                file.setExecutable(true, true)
-                file.setReadable(true, true)
+                try {
+                    file.setReadable(true, true)
+                    file.setWritable(true, true)
+                    file.setExecutable(true, true)
+                } catch (_: SecurityException) {
+                }
             }
     }
 }
