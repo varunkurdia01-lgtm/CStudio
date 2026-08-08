@@ -42,6 +42,12 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     var isCompileSuccess by mutableStateOf<Boolean?>(null)
         private set
         
+    fun clearOutput() {
+        output = ""
+        executionErrorDetails = null
+        isCompileSuccess = null
+    }
+        
     var isSearchVisible by mutableStateOf(false)
         private set
         

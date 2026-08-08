@@ -74,6 +74,7 @@ fun FilesScreen(
     
     var showCreateDialog by remember { mutableStateOf(false) }
     var newProjectName by remember { mutableStateOf("") }
+    var starterLanguage by remember { mutableStateOf("C") }
     
     var showRenameDialog by remember { mutableStateOf<String?>(null) }
     var renameProjectName by remember { mutableStateOf("") }
@@ -143,39 +144,76 @@ fun FilesScreen(
         )
     }
 
-    if (showCreateDialog) {
-        AlertDialog(
-            onDismissRequest = { showCreateDialog = false },
-            title = { Text("Create Project") },
-            text = {
+if (showCreateDialog) {
+    AlertDialog(
+        onDismissRequest = { showCreateDialog = false },
+        title = { Text("Create Project") },
+        text = {
+            Column {
                 OutlinedTextField(
                     value = newProjectName,
                     onValueChange = { newProjectName = it },
                     label = { Text("Project Name") },
                     singleLine = true
                 )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (newProjectName.isNotBlank()) {
-                        val name = newProjectName
-                        scope.launch {
-                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                repository.createProject(name)
-                                repository.createFile(name, "main.c", "#include <stdio.h>\n\nint main() {\n    return 0;\n}")
-                            }
-                            projects = repository.getProjects()
-                        }
-                    }
-                                        showCreateDialog = false
-                    newProjectName = ""
-                }) { Text("Create") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateDialog = false }) { Text("Cancel") }
+                Spacer(Modifier.height(12.dp))
+                Text("Starter file", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = starterLanguage == "C",
+                        onClick = { starterLanguage = "C" }
+                    )
+                    Text("C")
+                    Spacer(Modifier.width(12.dp))
+                    RadioButton(
+                        selected = starterLanguage == "C++",
+                        onClick = { starterLanguage = "C++" }
+                    )
+                    Text("C++")
+                }
             }
-        )
-    }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (newProjectName.isNotBlank()) {
+                    val name = newProjectName
+                    val fileName = if (starterLanguage == "C++") "main.cpp" else "main.c"
+                    val starterCode = if (starterLanguage == "C++") {
+                        "#include <iostream>
+
+int main() {
+    std::cout << \"Hello\";
+    return 0;
+}"
+                    } else {
+                        "#include <stdio.h>
+
+int main() {
+    printf(\"Hello\");
+    return 0;
+}"
+                    }
+                    scope.launch {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            repository.createProject(name)
+                            repository.createFile(name, fileName, starterCode)
+                        }
+                        projects = repository.getProjects()
+                    }
+                }
+                showCreateDialog = false
+                newProjectName = ""
+                starterLanguage = "C"
+            }) { Text("Create") }
+        },
+        dismissButton = {
+            TextButton(onClick = {
+                showCreateDialog = false
+                starterLanguage = "C"
+            }) { Text("Cancel") }
+        }
+    )
+}
 
     Scaffold(
         containerColor = Color.Transparent,

@@ -47,6 +47,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.foundation.text.selection.SelectionContainer
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +60,7 @@ fun EditorScreen(
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
+    val clipboardManager = LocalClipboardManager.current
 
     val safeNavigateBack = {
         keyboardController?.hide()
@@ -397,6 +401,32 @@ fun EditorScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                         }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(
+                            onClick = {
+                                if (viewModel.output.isNotBlank()) {
+                                    clipboardManager.setText(AnnotatedString(viewModel.output))
+                                    Toast.makeText(context, "Output copied", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            enabled = viewModel.output.isNotBlank()
+                        ) {
+                            Icon(
+                                Icons.Default.ContentCopy,
+                                contentDescription = "Copy Output",
+                                tint = if (viewModel.output.isNotBlank()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(
+                            onClick = { viewModel.clearOutput() },
+                            enabled = viewModel.output.isNotBlank() || viewModel.executionErrorDetails != null
+                        ) {
+                            Icon(
+                                Icons.Default.Clear,
+                                contentDescription = "Clear Output",
+                                tint = if (viewModel.output.isNotBlank() || viewModel.executionErrorDetails != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                     
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
@@ -408,12 +438,14 @@ fun EditorScreen(
                             .padding(20.dp)
                     ) {
                         item {
-                            Text(
-                                text = viewModel.output,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 14.sp,
-                                color = if (viewModel.output.contains("error", ignoreCase = true) && viewModel.executionErrorDetails == null) com.example.ui.theme.ErrorRed else MaterialTheme.colorScheme.onSurface
-                            )
+                            SelectionContainer {
+                                Text(
+                                    text = viewModel.output,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 14.sp,
+                                    color = if (viewModel.output.contains("error", ignoreCase = true) && viewModel.executionErrorDetails == null) com.example.ui.theme.ErrorRed else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
                         if (viewModel.executionErrorDetails != null) {
                             item {
@@ -441,16 +473,18 @@ fun EditorScreen(
                                 }
                                 
                                 if (isDetailsExpanded) {
-                                    Text(
-                                        text = viewModel.executionErrorDetails ?: "",
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-                                            .padding(12.dp)
-                                    )
+                                    SelectionContainer {
+                                        Text(
+                                            text = viewModel.executionErrorDetails ?: "",
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                                                .padding(12.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
