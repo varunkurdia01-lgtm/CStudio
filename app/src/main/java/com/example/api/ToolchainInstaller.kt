@@ -42,7 +42,7 @@ object ToolchainInstaller {
             copyChildren(root, destinationDir)
             ensureExecutableBits(destinationDir)
 
-            // Force the manager to use the new execution-safe location and verify it.
+            // Verify the newly installed executable toolchain in the Android code-cache location.
             val verifiedManager = BundledToolchainManager(context)
             verifiedManager.ensureToolchainReady()
 

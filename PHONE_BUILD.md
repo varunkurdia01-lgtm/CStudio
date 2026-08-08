@@ -20,3 +20,13 @@ This project is prepared to build the debug APK using GitHub Actions, so a lapto
 7. Test C and C++.
 
 The offline compiler ZIP is intentionally NOT embedded in this project ZIP. Keep using the separately-created `compiler-minimal.zip` (about 101 MB).
+
+
+## Offline compiler runtime fix
+
+The bundled clang toolchain is installed under Android's private `codeCacheDir`, not `filesDir`.
+This is intentional: modern Android builds can reject execution of ELF binaries copied into ordinary
+app data. The installer automatically migrates an older `files/cstudio_runtime/toolchain` install
+into the new location. After installing this APK, open Settings -> Test Local Toolchain once.
+If the previous compiler was installed, it will be migrated automatically; otherwise select the
+toolchain ZIP again.

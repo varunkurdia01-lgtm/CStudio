@@ -5,18 +5,28 @@ import java.io.File
 
 class BundledToolchainManager(private val context: Context) {
 
+    /*
+     * Android app data under filesDir is not a reliable place for executing
+     * ELF binaries on modern Android builds. The previous implementation
+     * installed clang under filesDir and then ProcessBuilder failed with
+     * "Cannot run program .../files/.../clang" even though the file existed
+     * and chmod +x succeeded.
+     *
+     * Keep the executable toolchain in codeCacheDir, which is the app's
+     * code-oriented private directory. The normal Settings > Clear Cache
+     * action only clears cacheDir, so the compiler remains installed.
+     */
     private val executionRoot: File
-        get() = File(context.filesDir, "cstudio_runtime")
+        get() = File(context.codeCacheDir, "cstudio_runtime")
 
     private val legacyToolchainDir: File
-        get() = File(context.codeCacheDir, "cstudio_runtime/toolchain")
+        get() = File(context.filesDir, "cstudio_runtime/toolchain")
 
     /**
      * Active install location for the offline compiler.
      *
-     * We keep the runtime in filesDir so it survives cache clearing.
-     * Existing installs from the previous codeCacheDir layout are migrated
-     * automatically the first time the app touches the toolchain.
+     * Existing installs from the old filesDir layout are migrated into the
+     * executable code-cache location automatically.
      */
     val toolchainDir: File
         get() = resolveToolchainDir()

@@ -36,10 +36,22 @@ class LocalCompilerService(private val context: Context) : CompilerService {
             sourceFile.writeText(request.code)
 
             val compilerBinary = toolchainManager.getCCompiler()
-            if (!compilerBinary.exists() || !compilerBinary.canExecute()) {
+            if (!compilerBinary.exists()) {
                 return@withContext CompileResponse(
                     stdout = "",
-                    stderr = "Compiler binary is present but not executable.\n\n${toolchainManager.checkToolchainStatus()}",
+                    stderr = "Offline compiler binary is missing: ${compilerBinary.absolutePath}\n\n${toolchainManager.checkToolchainStatus()}",
+                    executionTimeMs = System.currentTimeMillis() - startTime
+                )
+            }
+            // ZIP extraction does not preserve Unix mode bits. Best-effort chmod
+            // before launching the executable. Android may still reject execution
+            // from an unsuitable filesystem; the catch block below reports that
+            // exact OS error instead of pretending the compiler is merely missing.
+            try { compilerBinary.setExecutable(true, true) } catch (_: SecurityException) {}
+            if (!compilerBinary.canExecute()) {
+                return@withContext CompileResponse(
+                    stdout = "",
+                    stderr = "Offline compiler exists but Android does not allow it to execute.\n\n${toolchainManager.checkToolchainStatus()}",
                     executionTimeMs = System.currentTimeMillis() - startTime
                 )
             }
@@ -107,9 +119,10 @@ class LocalCompilerService(private val context: Context) : CompilerService {
             )
 
         } catch (e: Exception) {
+            val message = e.message ?: e.javaClass.simpleName
             return@withContext CompileResponse(
                 stdout = "",
-                stderr = "Local Compilation Error: ${e.message}\n${e.stackTraceToString()}",
+                stderr = "Local Compilation Error: $message\n\nCompiler path: ${toolchainManager.getCCompiler().absolutePath}\n\n${toolchainManager.checkToolchainStatus()}\n\nTechnical details:\n${e.stackTraceToString()}",
                 executionTimeMs = System.currentTimeMillis() - startTime
             )
         } finally {
