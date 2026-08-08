@@ -1,0 +1,35 @@
+--- app/src/main/java/com/example/CStudioApp.kt
++++ app/src/main/java/com/example/CStudioApp.kt
+@@ -19,6 +19,9 @@
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.unit.dp
+ import androidx.navigation.compose.currentBackStackEntryAsState
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.ui.platform.LocalContext
+ 
+ import com.example.ui.screens.HomeScreen
+ import com.example.ui.screens.EditorScreen
+@@ -26,11 +29,22 @@
+ import com.example.ui.screens.LessonsScreen
+ import com.example.ui.screens.FilesScreen
+ import com.example.ui.screens.SettingsScreen
++import com.example.ui.screens.WorkspaceSetupScreen
++import com.example.data.SettingsRepository
+ 
+ @Composable
+ fun CStudioApp() {
+     val navController = rememberNavController()
++    val context = LocalContext.current
++    val settings = remember { SettingsRepository(context) }
++    val hasWorkspace = remember { mutableStateOf(settings.workspaceUri != null) }
+     val editorViewModel: com.example.ui.screens.EditorViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
++
++    if (!hasWorkspace.value) {
++        WorkspaceSetupScreen(onWorkspaceSelected = { hasWorkspace.value = true })
++        return
++    }
++
+     Box(
+         modifier = Modifier
+             .fillMaxSize()
