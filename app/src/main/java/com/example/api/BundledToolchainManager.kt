@@ -6,18 +6,17 @@ import java.io.File
 class BundledToolchainManager(private val context: Context) {
 
     private val executionRoot: File
-        get() = File(context.codeCacheDir, "cstudio_runtime")
+        get() = File(context.filesDir, "cstudio_runtime")
 
     private val legacyToolchainDir: File
-        get() = File(context.filesDir, "toolchain")
+        get() = File(context.codeCacheDir, "cstudio_runtime/toolchain")
 
     /**
      * Active install location for the offline compiler.
      *
-     * We keep the runtime inside codeCacheDir because Android is much happier
-     * executing native binaries from there than from filesDir. Existing installs
-     * in filesDir/toolchain are migrated automatically the first time the app
-     * touches the toolchain.
+     * We keep the runtime in filesDir so it survives cache clearing.
+     * Existing installs from the previous codeCacheDir layout are migrated
+     * automatically the first time the app touches the toolchain.
      */
     val toolchainDir: File
         get() = resolveToolchainDir()
